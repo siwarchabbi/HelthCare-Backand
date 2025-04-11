@@ -3,10 +3,12 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const sendPasswordResetEmail = require("../models/emailUtils"); 
-
+const Prestataire = require("../models/PrestataireModel"); // import
 //@desc Register a user
 //@route POST /api/users/register
 //@access public
+
+
 const registerUser = asyncHandler(async (req, res) => {
   const { username, email, password, etat } = req.body;
 
@@ -15,36 +17,43 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error("All fields are mandatory!");
   }
 
-  if (password.length < 7 || !/[A-Z]/.test(password)) {
-    res.status(400);
-    throw new Error(
-      "Password must be at least 7 characters long and include at least one uppercase letter."
-    );
-  }
-
-  const userAvailable = await User.findOne({ email });
-  if (userAvailable) {
+  const userExists = await User.findOne({ email });
+  if (userExists) {
     res.status(400);
     throw new Error("User already registered!");
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  console.log("Hashed Password: ", hashedPassword);
 
   const user = await User.create({
     username,
     email,
     password: hashedPassword,
-    etat: etat || "ADMIN", // <-- this is the fix!
+    etat: etat || "ADMIN",
   });
 
-  console.log(`User created ${user}`);
-  if (user) {
-    res.status(201).json({ _id: user.id, email: user.email, etat: user.etat });
-  } else {
-    res.status(400);
-    throw new Error("User data is not valid");
+  // 👉 If it's a PRESTATAIRE, create extra doc
+  if (etat === "PRESTATAIRE") {
+    try {
+      const prestataire = await Prestataire.create({
+        userId: user._id,
+        speciality: "",
+        experience: 0,
+      });
+      console.log("Prestataire created:", prestataire);
+    } catch (error) {
+      console.error("Error creating Prestataire:", error);
+      res.status(500).json({ error: error.message, stack: error.stack });
+    }
+    
   }
+  
+
+  res.status(201).json({
+    _id: user.id,
+    email: user.email,
+    etat: user.etat,
+  });
 });
 
 
@@ -154,18 +163,23 @@ const currentUser = asyncHandler(async (req, res) => {
   res.json(req.user);
 });
 
-const getProfile = asyncHandler(async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
 
-    const userProfile = user.displayProfile();
-    res.json(userProfile);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+const getProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.userId);
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
   }
+
+  let profile = user.displayProfile();
+
+  if (user.etat === "PRESTATAIRE") {
+    const prestataireData = await Prestataire.findOne({ userId: user._id });
+    if (prestataireData) {
+      profile = { ...profile, prestataire: prestataireData };
+    }
+  }
+
+  res.json(profile);
 });
 
 //@desc Update user profile
@@ -195,6 +209,27 @@ const putProfile = async (req, res) => {
     if (updateData.lastname) user.lastname = updateData.lastname;
     if (updateData.address) user.address = updateData.address;
 
+
+    if (user.etat === "PRESTATAIRE") {
+      const prestataire = await Prestataire.findOne({ userId: userId });
+      if (prestataire) {
+        // Update prestataire data only if provided in the request
+        if (updateData.speciality) prestataire.speciality = updateData.speciality;
+        if (updateData.experience) prestataire.experience = updateData.experience;
+        if (updateData.diplomas) prestataire.diplomas = updateData.diplomas;
+        if (updateData.consultationModes) prestataire.consultationModes = updateData.consultationModes;
+        if (updateData.languagesSpoken) prestataire.languagesSpoken = updateData.languagesSpoken;
+        if (updateData.availableTimes) prestataire.availableTimes = updateData.availableTimes;
+        if (updateData.location) prestataire.location = updateData.location;
+        if (updateData.isVerified !== undefined) prestataire.isVerified = updateData.isVerified;
+    
+        await prestataire.save();
+      }
+    }
+    
+
+
+
     // Update user's image only if a new image is provided
     if (image) {
       user.image = image;
@@ -202,6 +237,7 @@ const putProfile = async (req, res) => {
     if (imageuser) {
       user.imageuser = imageuser;
     }
+  
 
     await user.save(); // Save the changes to the user
 
@@ -213,6 +249,38 @@ const putProfile = async (req, res) => {
   }
 };
 
+//@desc Get all users with "PRESTATAIRE" role
+//@route GET /api/users/prestataires
+//@access private (or public depending on your needs)
+const getAllPrestataires = asyncHandler(async (req, res) => {
+  try {
+    // Find all users with 'PRESTATAIRE' role
+    const prestataires = await User.find({ etat: "PRESTATAIRE" });
+
+    if (!prestataires || prestataires.length === 0) {
+      return res.status(404).json({ message: "No prestataires found" });
+    }
+
+    // Optionally, you can join the Prestataire data with each user
+    // Use .populate() to fetch related Prestataire data
+    const prestataireDetails = await Promise.all(
+      prestataires.map(async (user) => {
+        const prestataireData = await Prestataire.findOne({ userId: user._id });
+        return {
+          user: user,
+          prestataireData: prestataireData || {},
+        };
+      })
+    );
+
+    res.status(200).json(prestataireDetails);
+  } catch (error) {
+    console.error("Error fetching prestataires:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+
 module.exports = {
   registerUser,
   loginUser,
@@ -221,6 +289,7 @@ module.exports = {
   currentUser,
   getProfile,
   putProfile,
+  getAllPrestataires,
 };
 
 
@@ -232,4 +301,5 @@ module.exports = {
   currentUser,
   getProfile,
   putProfile,
+  getAllPrestataires,
 };

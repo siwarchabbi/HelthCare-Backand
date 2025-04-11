@@ -43,9 +43,11 @@ const userSchema = mongoose.Schema(
 userSchema.virtual("imageUrl").get(function () {
   return `/uploads/${this.image}`;
 });
-userSchema.virtual("imageUrl").get(function () {
+
+userSchema.virtual("imageUserUrl").get(function () {
   return `/uploads/${this.imageuser}`;
 });
+
 
 userSchema.methods.displayProfile = function () {
   return {

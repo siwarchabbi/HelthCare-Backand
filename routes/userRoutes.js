@@ -8,6 +8,7 @@ const {
   getProfile,
   forgotPassword,
   resetPassword,
+  getAllPrestataires,
 } = require("../controllers/userController");
 
 const validateToken = require("../middleware/validateTokenHandler");
@@ -24,6 +25,7 @@ const upload = multer({ storage: storage });
 const router = express.Router();
 
 router.post("/register", registerUser);
+router.get("/prestataires", getAllPrestataires);
 router.post("/login", loginUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
