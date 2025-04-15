@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const sendPasswordResetEmail = require("../models/emailUtils"); 
 const Prestataire = require("../models/PrestataireModel"); // import
+const Patient = require("../models/patientModel");
+
 //@desc Register a user
 //@route POST /api/users/register
 //@access public
@@ -29,7 +31,7 @@ const registerUser = asyncHandler(async (req, res) => {
     username,
     email,
     password: hashedPassword,
-    etat: etat || "ADMIN",
+    etat: etat || "ADMIN", // Default to "ADMIN" if no etat is provided
   });
 
   // 👉 If it's a PRESTATAIRE, create extra doc
@@ -44,10 +46,25 @@ const registerUser = asyncHandler(async (req, res) => {
     } catch (error) {
       console.error("Error creating Prestataire:", error);
       res.status(500).json({ error: error.message, stack: error.stack });
+      return; // Prevent further processing if there is an error creating Prestataire
     }
-    
   }
-  
+
+  // 👉 If it's a PATIENT, create extra doc
+  if (user.etat === "PATIENT") {
+    try {
+      const patient = new Patient({
+        userId: user._id, // Link to the User model
+        // Add patient-specific fields here, if needed
+      });
+      await patient.save();  // Save the patient document to the database
+      console.log("Patient created:", patient);
+    } catch (error) {
+      console.error("Error creating Patient:", error);
+      res.status(500).json({ error: error.message, stack: error.stack });
+      return; // Prevent further processing if there is an error creating Patient
+    }
+  }
 
   res.status(201).json({
     _id: user.id,
@@ -55,6 +72,7 @@ const registerUser = asyncHandler(async (req, res) => {
     etat: user.etat,
   });
 });
+
 
 
 
@@ -132,6 +150,39 @@ const forgotPassword = asyncHandler(async (req, res) => {
   }
 });
 
+//@desc Get full profile by userId depending on role
+//@route GET /api/profile/:userId
+//@access private
+const getUserProfileByRole = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  // Trouver le user
+  const user = await User.findById(userId);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  let profileData = null;
+
+  if (user.etat === "PRESTATAIRE") {
+    profileData = await Prestataire.findOne({ userId }).populate("userId");
+  } else if (user.etat === "PATIENT") {
+    profileData = await Patient.findOne({ userId }).populate("userId");
+  } else {
+    res.status(400).json({ message: "Unsupported user role" });
+    return;
+  }
+
+  if (!profileData) {
+    res.status(404).json({ message: "Profile not found" });
+    return;
+  }
+
+  res.status(200).json(profileData);
+});
+ 
 //@desc Reset password
 //@route POST /api/users/reset-password
 //@access public
@@ -164,121 +215,7 @@ const currentUser = asyncHandler(async (req, res) => {
 });
 
 
-const getProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.userId);
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
 
-  let profile = user.displayProfile();
-
-  if (user.etat === "PRESTATAIRE") {
-    const prestataireData = await Prestataire.findOne({ userId: user._id });
-    if (prestataireData) {
-      profile = { ...profile, prestataire: prestataireData };
-    }
-  }
-
-  res.json(profile);
-});
-
-//@desc Update user profile
-//@route PUT /api/users/update/:userId
-//@access private
-const putProfile = async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const updateData = req.body;
-    const image = req.file ? req.file.filename : null;
-    const imageuser = req.file ? req.file.filename : null;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Update user information
-    if (updateData.etat) user.etat = updateData.etat;
-    if (updateData.username) user.username = updateData.username;
-    if (updateData.email) user.email = updateData.email;
-    if (updateData.password) user.password = updateData.password;
-    if (updateData.age) user.age = updateData.age;
-    if (updateData.photoProfile) user.photoProfile = updateData.photoProfile;
-    if (updateData.phone) user.phone = updateData.phone;
-    if (updateData.firstname) user.firstname = updateData.firstname;
-    if (updateData.lastname) user.lastname = updateData.lastname;
-    if (updateData.address) user.address = updateData.address;
-
-
-    if (user.etat === "PRESTATAIRE") {
-      const prestataire = await Prestataire.findOne({ userId: userId });
-      if (prestataire) {
-        // Update prestataire data only if provided in the request
-        if (updateData.speciality) prestataire.speciality = updateData.speciality;
-        if (updateData.experience) prestataire.experience = updateData.experience;
-        if (updateData.diplomas) prestataire.diplomas = updateData.diplomas;
-        if (updateData.consultationModes) prestataire.consultationModes = updateData.consultationModes;
-        if (updateData.languagesSpoken) prestataire.languagesSpoken = updateData.languagesSpoken;
-        if (updateData.availableTimes) prestataire.availableTimes = updateData.availableTimes;
-        if (updateData.location) prestataire.location = updateData.location;
-        if (updateData.isVerified !== undefined) prestataire.isVerified = updateData.isVerified;
-    
-        await prestataire.save();
-      }
-    }
-    
-
-
-
-    // Update user's image only if a new image is provided
-    if (image) {
-      user.image = image;
-    }
-    if (imageuser) {
-      user.imageuser = imageuser;
-    }
-  
-
-    await user.save(); // Save the changes to the user
-
-    const updatedUser = await User.findById(userId);
-    res.json(updatedUser.displayProfile());
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "An error occurred while updating the profile. Please try again." });
-  }
-};
-
-//@desc Get all users with "PRESTATAIRE" role
-//@route GET /api/users/prestataires
-//@access private (or public depending on your needs)
-const getAllPrestataires = asyncHandler(async (req, res) => {
-  try {
-    // Find all users with 'PRESTATAIRE' role
-    const prestataires = await User.find({ etat: "PRESTATAIRE" });
-
-    if (!prestataires || prestataires.length === 0) {
-      return res.status(404).json({ message: "No prestataires found" });
-    }
-
-    // Optionally, you can join the Prestataire data with each user
-    // Use .populate() to fetch related Prestataire data
-    const prestataireDetails = await Promise.all(
-      prestataires.map(async (user) => {
-        const prestataireData = await Prestataire.findOne({ userId: user._id });
-        return {
-          user: user,
-          prestataireData: prestataireData || {},
-        };
-      })
-    );
-
-    res.status(200).json(prestataireDetails);
-  } catch (error) {
-    console.error("Error fetching prestataires:", error);
-    res.status(500).json({ error: "Internal Server Error", details: error.message });
-  }
-});
 
 
 module.exports = {
@@ -287,19 +224,9 @@ module.exports = {
   forgotPassword,
   resetPassword,
   currentUser,
-  getProfile,
-  putProfile,
-  getAllPrestataires,
+  getUserProfileByRole,
+
 };
 
 
-module.exports = {
-  registerUser,
-  loginUser,
-  forgotPassword,
-  resetPassword,
-  currentUser,
-  getProfile,
-  putProfile,
-  getAllPrestataires,
-};
+

@@ -4,11 +4,10 @@ const {
   registerUser,
   currentUser,
   loginUser,
-  putProfile,
-  getProfile,
+  getUserProfileByRole,
   forgotPassword,
   resetPassword,
-  getAllPrestataires,
+  
 } = require("../controllers/userController");
 
 const validateToken = require("../middleware/validateTokenHandler");
@@ -25,12 +24,10 @@ const upload = multer({ storage: storage });
 const router = express.Router();
 
 router.post("/register", registerUser);
-router.get("/prestataires", getAllPrestataires);
 router.post("/login", loginUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.get("/current", validateToken, currentUser);
-router.get("/profile/:userId", getProfile);
-router.put("/update/:userId", upload.single("image"), putProfile);
+router.get("/profile/:userId", getUserProfileByRole);
 
 module.exports = router;
