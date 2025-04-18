@@ -25,55 +25,89 @@ const getPrestataireProfile = asyncHandler(async (req, res) => {
 //@desc Update prestataire profile
 //@route PUT /api/prestataires/update/:userId
 //@access private
+
+
 const updatePrestataireProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.params.userId;
     const updateData = req.body;
-    const image = req.file ? req.file.filename : null;
-    const imageuser = req.file ? req.file.filename : null;
+
+    // Log incoming request data
+    console.log('Update data received:', updateData);
 
     const user = await User.findById(userId);
     if (!user || user.etat !== "PRESTATAIRE") {
       return res.status(404).json({ message: "Prestataire not found" });
     }
 
-    // Update user base fields
-    if (updateData.etat) user.etat = updateData.etat;
-    if (updateData.username) user.username = updateData.username;
+    // Update User fields (email, phone)
     if (updateData.email) user.email = updateData.email;
-    if (updateData.password) user.password = updateData.password;
-    if (updateData.age) user.age = updateData.age;
-    if (updateData.photoProfile) user.photoProfile = updateData.photoProfile;
     if (updateData.phone) user.phone = updateData.phone;
-    if (updateData.firstname) user.firstname = updateData.firstname;
-    if (updateData.lastname) user.lastname = updateData.lastname;
-    if (updateData.address) user.address = updateData.address;
-    if (image) user.image = image;
-    if (imageuser) user.imageuser = imageuser;
-
     await user.save();
 
-    // Update prestataire-specific fields
-    const prestataire = await Prestataire.findOne({ userId: userId });
-    if (prestataire) {
-      if (updateData.speciality) prestataire.speciality = updateData.speciality;
-      if (updateData.experience) prestataire.experience = updateData.experience;
-      if (updateData.diplomas) prestataire.diplomas = updateData.diplomas;
-      if (updateData.consultationModes) prestataire.consultationModes = updateData.consultationModes;
-      if (updateData.languagesSpoken) prestataire.languagesSpoken = updateData.languagesSpoken;
-      if (updateData.availableTimes) prestataire.availableTimes = updateData.availableTimes;
-      if (updateData.location) prestataire.location = updateData.location;
-      if (updateData.isVerified !== undefined) prestataire.isVerified = updateData.isVerified;
-      await prestataire.save();
+    const prestataire = await Prestataire.findOne({ userId });
+    if (!prestataire) {
+      return res.status(404).json({ message: "Prestataire profile not found" });
     }
+
+    // Update Prestataire-specific fields
+    if (updateData.speciality) prestataire.speciality = updateData.speciality;
+    if (updateData.experience !== undefined) prestataire.experience = updateData.experience;
+    if (updateData.numberOfDaysPerWeek !== undefined) prestataire.numberOfDaysPerWeek = updateData.numberOfDaysPerWeek;
+    if (updateData.consultationDuration !== undefined) prestataire.consultationDuration = updateData.consultationDuration;
+    if (updateData.consultationPrice !== undefined) prestataire.consultationPrice = updateData.consultationPrice;
+    if (updateData.consultationMode) prestataire.consultationMode = updateData.consultationMode;
+
+    // Check and parse the languagesSpoken field properly
+    if (updateData.languagesSpoken && Array.isArray(updateData.languagesSpoken)) {
+      prestataire.languagesSpoken = updateData.languagesSpoken;
+    } else if (typeof updateData.languagesSpoken === 'string') {
+      prestataire.languagesSpoken = updateData.languagesSpoken
+        .replace('[', '')
+        .replace(']', '')
+        .split(', ')
+        .map((e) => e.trim());
+    }
+
+    // Handle availableTimes field
+    if (updateData.availableTimes && typeof updateData.availableTimes === 'string') {
+      console.log('Availability Times as string:', updateData.availableTimes);
+      
+      // Manually parse the string into an array
+      const times = updateData.availableTimes
+        .replace('[', '')
+        .replace(']', '')
+        .split(', ')
+        .map((time) => time.trim());
+      
+      console.log('Parsed Times:', times);
+      
+      // Only set availableTimes if it's an array with valid times
+      if (Array.isArray(times) && times.length > 0) {
+        prestataire.availableTimes = times;
+      }
+    }
+    
+    // Log the final prestataire object before saving
+    console.log('Prestataire object before save:', prestataire);
+
+    await prestataire.save();
 
     const updatedUser = await User.findById(userId);
     res.json(updatedUser.displayProfile());
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Error updating prestataire profile", error: err.message });
   }
 });
+
+
+
+
+
+
+
+
+
 
 //@desc Get all prestataires
 //@route GET /api/prestataires

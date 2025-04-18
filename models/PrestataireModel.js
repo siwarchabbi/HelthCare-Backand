@@ -17,15 +17,24 @@ const prestataireSchema = mongoose.Schema({
       fileUrl: String,
     },
   ],
-  consultationModes: [String], // ex: ["En ligne", "En cabinet"]
-  languagesSpoken: [String],   // ex: ["Français", "Arabe"]
-  availableTimes: [
-    {
-      day: String,
-      from: String,
-      to: String,
-    },
-  ],
+  consultationMode: String,
+  languagesSpoken: [String],
+  availableTimes: {
+    type: [String],
+    default: ["08:00", "17:00"], // Default to a full day range if not provided
+  },
+  numberOfDaysPerWeek: {
+    type: Number,
+    default: 0,
+  },
+  consultationDuration: {
+    type: Number,
+    default: 0,
+  },
+  consultationPrice: {
+    type: Number,
+    default: 0,
+  },
   location: {
     type: {
       type: String,
@@ -33,12 +42,10 @@ const prestataireSchema = mongoose.Schema({
       default: "Point",
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
-      default: [0, 0], // Default to [0, 0] if no coordinates are provided
-      required: false, // Make it optional
+      type: [Number],
+      default: [0, 0],
       validate: {
         validator: function(value) {
-          // Check if coordinates are in correct format, i.e., an array of two numbers
           return Array.isArray(value) && value.length === 2 && !isNaN(value[0]) && !isNaN(value[1]);
         },
         message: "Coordinates must be an array of two numbers (longitude, latitude).",
@@ -54,5 +61,4 @@ const prestataireSchema = mongoose.Schema({
 });
 
 prestataireSchema.index({ location: "2dsphere" });
-
 module.exports = mongoose.model("Prestataire", prestataireSchema);
