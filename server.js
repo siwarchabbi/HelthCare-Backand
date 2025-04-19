@@ -23,6 +23,8 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/prestataires', require('./routes/prestataireRoutes'))
 app.use('/api/patients', require('./routes/patientRoutes'))
 app.use('/api/remboursements', require('./routes/RemboursementRoutes'));
+app.use("/api/reservations", require('./routes/reservationRoutes'))
+
 app.use(errorHandler);
  
 
