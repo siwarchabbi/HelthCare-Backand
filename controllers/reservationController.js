@@ -1,6 +1,6 @@
 const Reservation = require("../models/ReservationModel");
 const Prestataire = require("../models/PrestataireModel");
-const Patient = require("../models/patientModel");
+const Patient = require("../models/patientModel"); 
 const moment = require("moment"); // npm install moment
 // ✅ Créer une réservation
 const createReservation = async (req, res) => {
@@ -175,11 +175,33 @@ const getNextAvailableTime = async (req, res) => {
   }
 };
 
-  
+  // 📥 Obtenir toutes les réservations d’un patient
+const getReservationsByPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const reservations = await Reservation.find({ patientId })
+      .populate({
+        path: "prestataireId",
+        select: "speciality experience userId",
+        populate: {
+          path: "userId",
+          select: "nom prenom email"
+        }
+      })
+      .sort({ consultationDate: 1 });
+
+    res.status(200).json(reservations);
+  } catch (err) {
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+};
+
 
 module.exports = {
     createReservation,
     getAllReservations,
     getConsultationsByPatientAndPrestataire,
     getNextAvailableTime,
+    getReservationsByPatient,
 };
