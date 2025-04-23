@@ -137,8 +137,45 @@ const getAllPrestataires = asyncHandler(async (req, res) => {
   }
 });
 
+//@desc Get prestataire by _id from Prestataire collection
+//@route GET /api/prestataires/byid/:prestataireId
+//@access private
+const getPrestataireByPrestataireId = asyncHandler(async (req, res) => {
+  const prestataire = await Prestataire.findById(req.params.prestataireId).populate("userId");
+
+  if (!prestataire || !prestataire.userId || prestataire.userId.etat !== "PRESTATAIRE") {
+    return res.status(404).json({ message: "Prestataire not found" });
+  }
+
+  const user = prestataire.userId;
+
+  const profile = {
+    ...user.displayProfile(),
+    prestataire: {
+      speciality: prestataire.speciality,
+      experience: prestataire.experience,
+      diplomas: prestataire.diplomas,
+      consultationMode: prestataire.consultationMode,
+      languagesSpoken: prestataire.languagesSpoken,
+      availableTimes: prestataire.availableTimes,
+      numberOfDaysPerWeek: prestataire.numberOfDaysPerWeek,
+      consultationDuration: prestataire.consultationDuration,
+      consultationPrice: prestataire.consultationPrice,
+      location: prestataire.location,
+      isVerified: prestataire.isVerified,
+      _id: prestataire._id
+    }
+  };
+
+  res.status(200).json(profile);
+});
+
+
+
+
 module.exports = {
   getPrestataireProfile,
   updatePrestataireProfile,
   getAllPrestataires,
+  getPrestataireByPrestataireId,
 };

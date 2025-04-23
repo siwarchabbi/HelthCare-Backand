@@ -6,6 +6,7 @@ const {
   getPrestataireProfile,
   updatePrestataireProfile,
   getAllPrestataires,
+  getPrestataireByPrestataireId,
 } = require("../controllers/prestataireController");
 
 const validateToken = require("../middleware/validateTokenHandler");
@@ -29,5 +30,8 @@ router.put("/:userId", upload.single("image"), updatePrestataireProfile);
 
 // ✅ Récupérer tous les prestataires (public ou protégé selon ton choix)
 router.get("/", getAllPrestataires);
+
+router.get("/get-by-prestataire-id/:prestataireId", getPrestataireByPrestataireId);
+
 
 module.exports = router;
