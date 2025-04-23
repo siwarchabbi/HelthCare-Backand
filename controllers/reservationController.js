@@ -197,6 +197,27 @@ const getReservationsByPatient = async (req, res) => {
   }
 };
 
+// 📥 Obtenir le nombre de réservations faites par un patient
+const showPatientReservationCount = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // Vérifie si le patient existe
+    const patient = await Patient.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ message: "Patient introuvable" });
+    }
+
+    // Compte les réservations pour ce patient
+    const count = await Reservation.countDocuments({ patientId });
+
+    res.status(200).json({ reservationCount: count });
+  } catch (err) {
+    console.error("Erreur lors du comptage des réservations :", err.message);
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+};
+
 
 module.exports = {
     createReservation,
@@ -204,4 +225,5 @@ module.exports = {
     getConsultationsByPatientAndPrestataire,
     getNextAvailableTime,
     getReservationsByPatient,
+    showPatientReservationCount,
 };

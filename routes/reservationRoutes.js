@@ -7,6 +7,7 @@ const {
     getConsultationsByPatientAndPrestataire,
     getNextAvailableTime,
     getReservationsByPatient,
+    showPatientReservationCount,
   } = require("../controllers/reservationController");
   
   
@@ -20,5 +21,8 @@ router.get("/all-resrvations/:prestataireId", getAllReservations);
 router.get("/by-patient-and-prestataire/:patientId/:prestataireId", getConsultationsByPatientAndPrestataire);
 router.get("/next-available/:prestataireId", getNextAvailableTime);
 router.get('/patient-all-res/:patientId', getReservationsByPatient);
+// Exemple avec Express
+router.get('/count/:patientId', showPatientReservationCount);
+
 
 module.exports = router;

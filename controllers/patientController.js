@@ -37,6 +37,7 @@ const getPatientById = asyncHandler(async (req, res) => {
   res.json(profile);
 });
 
+
 // ✅ Update patient profile
 const updatePatientProfile = asyncHandler(async (req, res) => {
   const userId = req.params.userId;
@@ -64,8 +65,30 @@ const updatePatientProfile = asyncHandler(async (req, res) => {
   res.json({ message: "Patient updated successfully" });
 });
 
+const getPatientByPatientId = asyncHandler(async (req, res) => {
+  const patient = await Patient.findById(req.params.patientId).populate("userId");
+
+  if (!patient || !patient.userId || patient.userId.etat !== "PATIENT") {
+    return res.status(404).json({ message: "Patient not found" });
+  }
+
+  const user = patient.userId;
+  const profile = {
+    ...user.displayProfile(),
+    patient: {
+      mutuelle: patient.mutuelle,
+      dossierMedical: patient.dossierMedical,
+      _id: patient._id
+    }
+  };
+
+  res.json(profile);
+});
+
 module.exports = {
   getAllPatients,
   getPatientById,
-  updatePatientProfile
+  updatePatientProfile,
+  getPatientByPatientId,
+  
 };

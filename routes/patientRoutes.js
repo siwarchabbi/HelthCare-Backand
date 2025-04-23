@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { getAllPatients, getPatientById, updatePatientProfile } = require("../controllers/patientController");
+const { getAllPatients, getPatientById, updatePatientProfile,getPatientByPatientId } = require("../controllers/patientController");
 const validateToken = require("../middleware/validateTokenHandler");
 const multer = require("multer");
 
@@ -18,5 +18,7 @@ const upload = multer({ storage: storage });
 router.get("/", getAllPatients);
 router.get("/:userId", getPatientById);
 router.post("/update/:userId", updatePatientProfile);
+router.get("/get-by-patient-id/:patientId", getPatientByPatientId);
+
 
 module.exports = router;
