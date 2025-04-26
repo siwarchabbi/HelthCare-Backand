@@ -39,6 +39,26 @@ const incrementReservation = async (req, res) => {
   }
 };
 
+// 📦 Get confirmed reservations count of a prestataire
+const getConfirmedReservationsByPrestataireId = async (req, res) => {
+  try {
+    const { prestataireId } = req.params; // Récupération de l'ID depuis les paramètres
+
+    const prestataire = await Prestataire.findById(prestataireId);
+
+    if (!prestataire) {
+      return res.status(404).json({ message: 'Prestataire non trouvé' });
+    }
+
+    // Retourne juste le nombre de réservations confirmées
+    res.status(200).json({
+      reservationsConfirmées: prestataire.reservationsConfirmées || 0
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+};
 
 
 // ➕ Incrémentation des vues de spécialité globale
@@ -175,4 +195,5 @@ module.exports = {
   getPrestataireStats,
   incrementSpecialityView,
   getSpecialityViews,
+  getConfirmedReservationsByPrestataireId,
 };
