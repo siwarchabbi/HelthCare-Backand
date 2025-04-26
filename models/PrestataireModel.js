@@ -21,7 +21,7 @@ const prestataireSchema = mongoose.Schema({
   languagesSpoken: [String],
   availableTimes: {
     type: [String],
-    default: ["08:00", "17:00"], // Default to a full day range if not provided
+    default: ["08:00", "17:00"],
   },
   numberOfDaysPerWeek: {
     type: Number,
@@ -45,12 +45,39 @@ const prestataireSchema = mongoose.Schema({
       type: [Number],
       default: [0, 0],
       validate: {
-        validator: function(value) {
-          return Array.isArray(value) && value.length === 2 && !isNaN(value[0]) && !isNaN(value[1]);
+        validator: function (value) {
+          return (
+            Array.isArray(value) &&
+            value.length === 2 &&
+            !isNaN(value[0]) &&
+            !isNaN(value[1])
+          );
         },
-        message: "Coordinates must be an array of two numbers (longitude, latitude).",
+        message:
+          "Coordinates must be an array of two numbers (longitude, latitude).",
       },
     },
+  }, 
+  specialityViews: [
+    {
+      name: { type: String, required: true },
+      viewCount: { type: Number, default: 0 },
+      viewedBy: [
+        {
+          userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+          dateViewed: { type: Date, default: Date.now }
+        }
+      ]
+    }
+  ],
+  
+  visitesProfil: {
+    type: Number,
+    default: 0,
+  },
+  reservationsConfirmées: {
+    type: Number,
+    default: 0,
   },
   isVerified: {
     type: Boolean,
@@ -61,4 +88,5 @@ const prestataireSchema = mongoose.Schema({
 });
 
 prestataireSchema.index({ location: "2dsphere" });
+
 module.exports = mongoose.model("Prestataire", prestataireSchema);
