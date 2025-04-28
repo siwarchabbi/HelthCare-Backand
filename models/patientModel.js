@@ -14,7 +14,14 @@ const patientSchema = mongoose.Schema({
   dossierMedical: {
     type: String,
     required: false,
-  }
+  },
+  favorites: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Prestataire"
+    }
+  ],
+  
 }, {
   timestamps: true
 });

@@ -24,6 +24,7 @@ app.use('/api/prestataires', require('./routes/prestataireRoutes'))
 app.use('/api/patients', require('./routes/patientRoutes'))
 app.use("/api/reservations", require('./routes/reservationRoutes'))
 app.use('/api/statistics', require('./routes/statisticRouters'))
+app.use("/api/favorites", require('./routes/favoriteRoutes'));
 
 
 app.use(errorHandler);
