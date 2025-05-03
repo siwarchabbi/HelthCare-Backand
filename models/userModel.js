@@ -31,7 +31,7 @@ const userSchema = mongoose.Schema(
 
     etat: {
       type: String,
-      enum: ["ADMIN", "PRESTATAIRE","ASSUREUR","PATIENT"],
+      enum: [ "PRESTATAIRE","ASSUREUR","PATIENT"],
       default: "PATIENT"
     }
   },

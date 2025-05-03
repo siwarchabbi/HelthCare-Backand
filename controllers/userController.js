@@ -5,6 +5,8 @@ const User = require("../models/userModel");
 const sendPasswordResetEmail = require("../models/emailUtils"); 
 const Prestataire = require("../models/PrestataireModel"); // import
 const Patient = require("../models/patientModel");
+const Assureur = require("../models/assuranceModel");
+
 
 //@desc Register a user
 //@route POST /api/users/register
@@ -31,10 +33,10 @@ const registerUser = asyncHandler(async (req, res) => {
     username,
     email,
     password: hashedPassword,
-    etat: etat || "ADMIN", // Default to "ADMIN" if no etat is provided
+    etat: etat || "PATIENT",
   });
-
-  // 👉 If it's a PRESTATAIRE, create extra doc
+  
+  // Create PRESTATAIRE document
   if (etat === "PRESTATAIRE") {
     try {
       const prestataire = await Prestataire.create({
@@ -46,25 +48,39 @@ const registerUser = asyncHandler(async (req, res) => {
     } catch (error) {
       console.error("Error creating Prestataire:", error);
       res.status(500).json({ error: error.message, stack: error.stack });
-      return; // Prevent further processing if there is an error creating Prestataire
+      return;
     }
   }
-
-  // 👉 If it's a PATIENT, create extra doc
-  if (user.etat === "PATIENT") {
+  
+  // Create PATIENT document
+  if (etat === "PATIENT") {
     try {
-      const patient = new Patient({
-        userId: user._id, // Link to the User model
-        // Add patient-specific fields here, if needed
-      });
-      await patient.save();  // Save the patient document to the database
+      const patient = await Patient.create({ userId: user._id });
       console.log("Patient created:", patient);
     } catch (error) {
       console.error("Error creating Patient:", error);
       res.status(500).json({ error: error.message, stack: error.stack });
-      return; // Prevent further processing if there is an error creating Patient
+      return;
     }
   }
+  
+  // ✅ Create ASSUREUR document (moved out of the wrong block)
+  if (etat === "ASSUREUR") {
+    try {
+      const Assureur = require("../models/assuranceModel");
+      const assureur = await Assureur.create({
+        userId: user._id,
+        agencyName: "",
+        insuranceTypes: [],
+      });
+      console.log("Assureur created:", assureur);
+    } catch (error) {
+      console.error("Error creating Assureur:", error);
+      res.status(500).json({ error: error.message, stack: error.stack });
+      return;
+    }
+  }
+  
 
   res.status(201).json({
     _id: user.id,
