@@ -109,6 +109,34 @@ const createReservation = async (req, res) => {
   };
   
 
+
+  const getAllReservationsWithDetails = async (req, res) => {
+    try {
+      const reservations = await Reservation.find()
+        .populate({
+          path: "patientId",
+          populate: {
+            path: "userId", // embedded user in patient
+            select: "nom prenom email"
+          },
+          select: "mutuelle dossierMedical userId"
+        })
+        .populate({
+          path: "prestataireId",
+          select: "speciality experience userId",
+          populate: {
+            path: "userId",
+            select: "nom prenom email"
+          }
+        })
+        .sort({ consultationDate: 1 });
+  
+      res.status(200).json(reservations);
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur", error: err.message });
+    }
+  };
+  
 // 📥 Obtenir toutes les consultations d’un patient chez un prestataire
 const getConsultationsByPatientAndPrestataire = async (req, res) => {
   try {
@@ -222,6 +250,7 @@ const showPatientReservationCount = async (req, res) => {
 module.exports = {
     createReservation,
     getAllReservations,
+    getAllReservationsWithDetails,
     getConsultationsByPatientAndPrestataire,
     getNextAvailableTime,
     getReservationsByPatient,

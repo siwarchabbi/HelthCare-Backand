@@ -4,6 +4,7 @@ const router = express.Router();
 const {
     createReservation,
     getAllReservations,
+    getAllReservationsWithDetails,
     getConsultationsByPatientAndPrestataire,
     getNextAvailableTime,
     getReservationsByPatient,
@@ -16,6 +17,7 @@ router.post("/", createReservation);
 
 // Obtenir toutes les réservations d’un prestataire
 router.get("/all-resrvations/:prestataireId", getAllReservations);
+router.get("/with-details", getAllReservationsWithDetails);
 
 // Obtenir les consultations d’un patient avec un prestataire
 router.get("/by-patient-and-prestataire/:patientId/:prestataireId", getConsultationsByPatientAndPrestataire);
