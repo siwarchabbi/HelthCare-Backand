@@ -8,7 +8,14 @@ const assureurSchema = mongoose.Schema(
       required: true,
     },
     agencyName: String,
-    insuranceTypes: [String], // e.g., ["Auto", "Health", "Home"]
+    insuranceTypes: {
+      type: [String],
+      default: ["Health"], // ✅ Valeur par défaut
+    },
+    reductionPercentage: {
+      type: Number,
+      default: 0, // % de réduction, par défaut 0
+    },
   },
   {
     timestamps: true,
