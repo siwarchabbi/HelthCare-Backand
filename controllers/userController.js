@@ -95,18 +95,33 @@ const registerUser = asyncHandler(async (req, res) => {
 //@desc Login user
 //@route POST /api/users/login
 //@access public
+
+
+
 const loginUser = asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ error: "All fields are mandatory!" });
-      return;
+      return res.status(400).json({ error: "All fields are mandatory!" });
     }
 
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      let prestataireData = null;
+
+      // 🔒 Check if the user is a PRESTATAIRE and not verified
+      if (user.etat === "PRESTATAIRE") {
+        const prestataire = await Prestataire.findOne({ userId: user._id });
+        if (!prestataire || !prestataire.isVerified) {
+          return res.status(403).json({
+            error: "Your account is not verified yet. Please wait for confirmation.",
+          });
+        }
+        prestataireData = prestataire;
+      }
+
       const accessToken = jwt.sign(
         {
           user: {
@@ -117,8 +132,7 @@ const loginUser = asyncHandler(async (req, res) => {
         { expiresIn: "15m" }
       );
 
-      // Include user details in the response
-      res.status(200).json({
+      return res.status(200).json({
         message: "User found and logged in successfully",
         accessToken,
         user: {
@@ -126,16 +140,21 @@ const loginUser = asyncHandler(async (req, res) => {
           username: user.username,
           email: user.email,
           etat: user.etat,
+          prestataire: prestataireData, // ✅ Ajouter cette ligne
         },
       });
     } else {
-      res.status(401).json({ error: "Email or password is not valid" });
+      return res.status(401).json({ error: "Email or password is not valid" });
     }
   } catch (error) {
     console.error("Error in loginUser:", error);
-    res.status(500).json({ error: "Internal Server Error", details: error.message });
+    return res.status(500).json({
+      error: "Internal Server Error",
+      details: error.message,
+    });
   }
 });
+
 
 //@desc Forgot password
 //@route POST /api/users/forgot-password
