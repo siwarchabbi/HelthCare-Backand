@@ -15,6 +15,11 @@ const patientSchema = mongoose.Schema({
     type: String,
     required: false,
   },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  
   favorites: [
     {
       type: mongoose.Schema.Types.ObjectId,

@@ -1,20 +1,26 @@
 const Prestataire = require("../models/PrestataireModel");
 const Assureur = require('../models/assuranceModel');  // Adjust the path to your Assureur model
+const Patient = require("../models/patientModel");
+const { sendVerificationEmail } = require("../middleware/emailMiddleware");
 
 
-// Vérifier ou non un prestataire
 const toggleVerification = async (req, res) => {
   try {
     const { prestataireId } = req.params;
     const { isVerified } = req.body;
 
-    const prestataire = await Prestataire.findById(prestataireId);
+    const prestataire = await Prestataire.findById(prestataireId).populate("userId");
     if (!prestataire) {
       return res.status(404).json({ message: "Prestataire not found" });
     }
 
     prestataire.isVerified = isVerified;
     await prestataire.save();
+
+    // Send email
+    const email = prestataire.userId.email;
+    const username = prestataire.userId.username;
+    await sendVerificationEmail(email, username, isVerified);
 
     res.status(200).json({
       message: `Prestataire ${isVerified ? "verified" : "unverified"} successfully.`,
@@ -25,6 +31,37 @@ const toggleVerification = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
+const togglePatientVerification = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { isVerified } = req.body;
+
+    const patient = await Patient.findById(patientId).populate("userId");
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+
+    patient.isVerified = isVerified;
+    await patient.save();
+
+    // Send email to patient
+    const email = patient.userId.email;
+    const username = patient.userId.username;
+    await sendVerificationEmail(email, username, isVerified);
+
+    res.status(200).json({
+      message: `Patient ${isVerified ? "verified" : "unverified"} successfully.`,
+      patient,
+    });
+  } catch (error) {
+    console.error("Patient verification error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 
 // 🔄 Mise à jour du profil assureur via l'ID de l'assureur
@@ -105,6 +142,7 @@ module.exports = {
   toggleVerification,
   updateAssureurProfileByAssureurId,
   getAssureurById,
+  togglePatientVerification,
 };
 
 

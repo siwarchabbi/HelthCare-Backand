@@ -12,7 +12,6 @@ const Assureur = require("../models/assuranceModel");
 //@route POST /api/users/register
 //@access public
 
-
 const registerUser = asyncHandler(async (req, res) => {
   const { username, email, password, etat } = req.body;
 
@@ -89,32 +88,32 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 });
 
-
-
-
 //@desc Login user
 //@route POST /api/users/login
 //@access public
-
-
 
 const loginUser = asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Vérifier que les champs email et password sont présents
     if (!email || !password) {
       return res.status(400).json({ error: "All fields are mandatory!" });
     }
 
+    // Trouver l'utilisateur par email
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       let prestataireData = null;
+      let patientData = null;
 
-      // 🔒 Check if the user is a PRESTATAIRE and not verified
+      // 🔒 Vérification si l'utilisateur est un PRESTATAIRE et s'il est vérifié
       if (user.etat === "PRESTATAIRE") {
         const prestataire = await Prestataire.findOne({ userId: user._id });
+        
         if (!prestataire || !prestataire.isVerified) {
+          // Si le prestataire n'existe pas ou s'il n'est pas vérifié
           return res.status(403).json({
             error: "Your account is not verified yet. Please wait for confirmation.",
           });
@@ -122,6 +121,20 @@ const loginUser = asyncHandler(async (req, res) => {
         prestataireData = prestataire;
       }
 
+      // 🔒 Vérification si l'utilisateur est un PATIENT et s'il est vérifié
+      if (user.etat === "PATIENT") {
+        const patient = await Patient.findOne({ userId: user._id });
+
+        if (!patient || !patient.isVerified) {
+          // Si le patient n'existe pas ou s'il n'est pas vérifié
+          return res.status(403).json({
+            error: "Your patient account is not verified yet. Please wait for confirmation.",
+          });
+        }
+        patientData = patient;
+      }
+
+      // Création d'un accessToken avec une durée de validité de 15 minutes
       const accessToken = jwt.sign(
         {
           user: {
@@ -132,6 +145,7 @@ const loginUser = asyncHandler(async (req, res) => {
         { expiresIn: "15m" }
       );
 
+      // Retourner la réponse avec les informations de l'utilisateur, du prestataire et du patient
       return res.status(200).json({
         message: "User found and logged in successfully",
         accessToken,
@@ -140,20 +154,24 @@ const loginUser = asyncHandler(async (req, res) => {
           username: user.username,
           email: user.email,
           etat: user.etat,
-          prestataire: prestataireData, // ✅ Ajouter cette ligne
+          prestataire: prestataireData, // ✅ Ajouter cette ligne pour renvoyer les données du prestataire
+          patient: patientData, // ✅ Ajouter cette ligne pour renvoyer les données du patient
         },
       });
     } else {
+      // Si l'email ou le mot de passe sont invalides
       return res.status(401).json({ error: "Email or password is not valid" });
     }
   } catch (error) {
     console.error("Error in loginUser:", error);
+    // Gestion des erreurs du serveur
     return res.status(500).json({
       error: "Internal Server Error",
       details: error.message,
     });
   }
 });
+
 
 
 //@desc Forgot password
