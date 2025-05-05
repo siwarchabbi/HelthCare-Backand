@@ -1,24 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const { getAllPatients, getPatientById, updatePatientProfile,getPatientByPatientId } = require("../controllers/patientController");
+const {
+  getAllPatients,
+  getPatientById,
+  updatePatientProfile,
+  getPatientByPatientId
+} = require("../controllers/patientController");
 const validateToken = require("../middleware/validateTokenHandler");
-const multer = require("multer");
-
-// Configuration de multer (pour l'upload d'image)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./uploads");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-const upload = multer({ storage: storage });
+const upload = require("../middleware/upload"); // ✅ Use the central upload config
 
 router.get("/", getAllPatients);
 router.get("/:userId", getPatientById);
-router.post("/update/:userId", updatePatientProfile);
 router.get("/get-by-patient-id/:patientId", getPatientByPatientId);
 
+// ✅ Use PUT instead of POST, and attach upload.single("imageuser")
+router.put("/update/:userId", upload.single("imageuser"), updatePatientProfile);
 
 module.exports = router;

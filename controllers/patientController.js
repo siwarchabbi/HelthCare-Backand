@@ -43,15 +43,21 @@ const updatePatientProfile = asyncHandler(async (req, res) => {
   const userId = req.params.userId;
   const updateData = req.body;
 
+  // ✅ Vérifier si l'utilisateur existe et est bien un PATIENT
   const user = await User.findById(userId);
   if (!user || user.etat !== "PATIENT") {
     return res.status(404).json({ message: "Patient not found" });
   }
 
-  // Mise à jour User
+  // ✅ Enregistrer l'image envoyée dans imageuser
+  if (req.file) {
+    updateData.imageuser = req.file.filename;
+  }
+
+  // ✅ Mettre à jour les données de l'utilisateur (y compris imageuser)
   await user.updateInfo(updateData);
 
-  // Mise à jour Patient
+  // ✅ Mettre à jour ou créer les données spécifiques au patient
   let patient = await Patient.findOne({ userId: userId });
   if (!patient) {
     patient = new Patient({ userId: userId });
@@ -64,6 +70,7 @@ const updatePatientProfile = asyncHandler(async (req, res) => {
 
   res.json({ message: "Patient updated successfully" });
 });
+
 
 const getPatientByPatientId = asyncHandler(async (req, res) => {
   const patient = await Patient.findById(req.params.patientId).populate("userId");
