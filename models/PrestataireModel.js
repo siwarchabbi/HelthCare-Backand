@@ -24,8 +24,9 @@ const prestataireSchema = mongoose.Schema({
     default: ["08:00", "17:00"],
   },
   numberOfDaysPerWeek: {
-    type: Number,
-    default: 0,
+    type: [Number], // This will store an array of numbers
+    enum: [1, 2, 3, 4, 5, 6, 7], // The valid days of the week
+    default: [], // Default is an empty array
   },
   consultationDuration: {
     type: Number,

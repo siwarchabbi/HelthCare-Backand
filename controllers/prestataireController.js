@@ -26,7 +26,7 @@ const getPrestataireProfile = asyncHandler(async (req, res) => {
 //@route PUT /api/prestataires/update/:userId
 //@access private
 
-
+/*
 const updatePrestataireProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -98,8 +98,90 @@ const updatePrestataireProfile = asyncHandler(async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Error updating prestataire profile", error: err.message });
   }
-});
+});*/
 
+const updatePrestataireProfile = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const updateData = req.body;
+
+    // Log incoming request data
+    console.log('Update data received:', updateData);
+
+    const user = await User.findById(userId);
+    if (!user || user.etat !== "PRESTATAIRE") {
+      return res.status(404).json({ message: "Prestataire not found" });
+    }
+
+    // Update User fields (email, phone)
+    if (updateData.email) user.email = updateData.email;
+    if (updateData.phone) user.phone = updateData.phone;
+
+    // If an image is uploaded, update the image field in the User model
+   
+    if (req.file) {
+      updateData.imageuser = req.file.filename;
+    }
+
+    await user.save();
+
+    const prestataire = await Prestataire.findOne({ userId });
+    if (!prestataire) {
+      return res.status(404).json({ message: "Prestataire profile not found" });
+    }
+
+    // Update Prestataire-specific fields
+    if (updateData.speciality) prestataire.speciality = updateData.speciality;
+    if (updateData.experience !== undefined) prestataire.experience = updateData.experience;
+    if (updateData.numberOfDaysPerWeek !== undefined) prestataire.numberOfDaysPerWeek = updateData.numberOfDaysPerWeek;
+    if (updateData.consultationDuration !== undefined) prestataire.consultationDuration = updateData.consultationDuration;
+    if (updateData.consultationPrice !== undefined) prestataire.consultationPrice = updateData.consultationPrice;
+    if (updateData.consultationMode) prestataire.consultationMode = updateData.consultationMode;
+
+    // Check and parse the languagesSpoken field properly
+    if (updateData.languagesSpoken && Array.isArray(updateData.languagesSpoken)) {
+      prestataire.languagesSpoken = updateData.languagesSpoken;
+    } else if (typeof updateData.languagesSpoken === 'string') {
+      prestataire.languagesSpoken = updateData.languagesSpoken
+        .replace('[', '')
+        .replace(']', '')
+        .split(', ')
+        .map((e) => e.trim());
+    }
+
+    // Handle availableTimes field
+   // Handle availableTimes field
+// Handle availableTimes field safely (can be string or array)
+if (updateData.availableTimes) {
+  if (Array.isArray(updateData.availableTimes)) {
+    // Already an array
+    prestataire.availableTimes = updateData.availableTimes.map((time) => time.trim());
+  } else if (typeof updateData.availableTimes === 'string') {
+    // Convert string to array
+    const times = updateData.availableTimes
+      .replace('[', '')
+      .replace(']', '')
+      .split(',')
+      .map((time) => time.trim());
+
+    prestataire.availableTimes = times;
+  }
+}
+
+
+    
+    // Log the final prestataire object before saving
+    console.log('Prestataire object before save:', prestataire);
+
+    await prestataire.save();
+
+    // Return the updated User profile
+    const updatedUser = await User.findById(userId);
+    res.json(updatedUser.displayProfile());
+  } catch (err) {
+    res.status(500).json({ message: "Error updating prestataire profile", error: err.message });
+  }
+});
 
 
 
