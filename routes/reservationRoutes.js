@@ -9,6 +9,7 @@ const {
     getNextAvailableTime,
     getReservationsByPatient,
     showPatientReservationCount,
+    getAvailableTimeSlots,
   } = require("../controllers/reservationController");
   
   
@@ -18,6 +19,7 @@ router.post("/", createReservation);
 // Obtenir toutes les réservations d’un prestataire
 router.get("/all-resrvations/:prestataireId", getAllReservations);
 router.get("/with-details", getAllReservationsWithDetails);
+router.post('/available-timeslots', getAvailableTimeSlots);
 
 // Obtenir les consultations d’un patient avec un prestataire
 router.get("/by-patient-and-prestataire/:patientId/:prestataireId", getConsultationsByPatientAndPrestataire);

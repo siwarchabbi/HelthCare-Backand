@@ -1,62 +1,145 @@
 const Reservation = require("../models/ReservationModel");
 const Prestataire = require("../models/PrestataireModel");
 const Patient = require("../models/patientModel"); 
-const moment = require("moment"); // npm install moment
-// ✅ Créer une réservation
+  // ✅ Créer une réservation
+
+const moment = require('moment-timezone');
+
+
 const createReservation = async (req, res) => {
-    try {
-      const { patientId, prestataireId, desiredDate } = req.body;
-  
-      const prestataire = await Prestataire.findById(prestataireId);
-      if (!prestataire) {
-        return res.status(404).json({ message: "Prestataire non trouvé" });
-      }
-  
-      const duration = prestataire.consultationDuration || 60;
-      const start = moment(desiredDate);
-  
-      // Check if the desired date is available
-      const existingReservation = await Reservation.findOne({
-        prestataireId,
-        consultationDate: start.toDate(),
-      });
-  
-      if (existingReservation) {
-        return res.status(409).json({ message: "Ce créneau est déjà réservé" });
-      }
-  
-      // Create the reservation
-      const reservation = new Reservation({
-        patientId,
-        prestataireId,
-        consultationDate: start.toDate(),
-        consultationDuration: duration,
-        consultationPrice: prestataire.consultationPrice,
-      });
-  
-      await reservation.save();
-  
-      // Calculate the next available time (add the consultation duration)
-      const nextAvailableTime = start.add(duration, 'minutes').toDate();
-  
-      // Update the last available time for the prestataire
-      prestataire.lastAvailableTime = nextAvailableTime;
-      await prestataire.save();
-  
-      // Send the response
-      res.status(201).json({
-        message: "Réservation confirmée",
-        reservation,
-        nextAvailableTime: nextAvailableTime.toISOString(), // Send the next available time
-      });
-    } catch (err) {
-      console.error("Erreur lors de la création de la réservation :", err.message);
-      res.status(500).json({ message: "Erreur serveur", error: err.message });
+  try {
+    const { patientId, prestataireId, consultationDateOfJour, consultationDate } = req.body;
+
+    const prestataire = await Prestataire.findById(prestataireId);
+    if (!prestataire) {
+      return res.status(404).json({ message: "Prestataire non trouvé" });
     }
-  };
-  
-  
-  
+
+    const duration = prestataire.consultationDuration || 60;
+
+    // Exemple: "09:15-18:00"
+    const [startTimeStr, endTimeStr] = prestataire.availableTimes[0].split('-');
+
+    // On parse la date du jour sans heure
+    const day = moment.tz(consultationDateOfJour, 'YYYY-MM-DD', 'Africa/Tunis').startOf('day');
+
+    // On parse la date + heure dans le fuseau horaire de Tunis
+    const start = moment.tz(`${consultationDateOfJour} ${consultationDate}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
+
+    const startRange = moment.tz(`${consultationDateOfJour} ${startTimeStr}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
+    let endRange = moment.tz(`${consultationDateOfJour} ${endTimeStr}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
+
+    if (endRange.isBefore(startRange)) {
+      endRange.add(1, 'day');
+    }
+
+    if (!start.isBetween(startRange, endRange, null, '[)')) {
+      return res.status(400).json({
+        message: `Heure hors plage autorisée : de ${startTimeStr} à ${endTimeStr}`,
+      });
+    }
+
+    // Vérifie si le créneau est déjà réservé
+    const existingReservation = await Reservation.findOne({
+      prestataireId,
+      consultationDate: start.toDate(),
+    });
+
+    if (existingReservation) {
+      return res.status(409).json({ message: "Ce créneau est déjà réservé" });
+    }
+
+    const reservation = new Reservation({
+      patientId,
+      prestataireId,
+      consultationDate: start.toDate(),      // date+heure en UTC mais issue de l'heure locale
+      consultationDateOfJour: day.toDate(),  // juste la date (heure 00:00)
+      consultationDuration: duration,
+      consultationPrice: prestataire.consultationPrice,
+    });
+
+    await reservation.save();
+
+    // Calcule prochaine dispo
+    const nextAvailable = moment(start).add(duration, 'minutes');
+    let nextAvailableTime;
+
+    if (nextAvailable.isBefore(endRange)) {
+      nextAvailableTime = nextAvailable.format("HH:mm:ss");
+    } else {
+      nextAvailableTime = startRange.add(1, 'day').format("HH:mm:ss");
+    }
+
+    prestataire.lastAvailableTime = nextAvailable.toDate();
+    await prestataire.save();
+
+    res.status(201).json({
+      message: "Réservation confirmée",
+      reservation,
+      nextAvailableTime
+    });
+
+  } catch (err) {
+    console.error("Erreur lors de la création de la réservation :", err.message);
+    res.status(500).json({ message: "Erreur serveur", error: err.message });
+  }
+};
+
+
+
+
+const getAvailableTimeSlots = async (req, res) => {
+  try {
+    const { prestataireId, consultationDateOfJour } = req.body;
+
+    // Validate input
+    if (!prestataireId || !consultationDateOfJour) {
+      return res.status(400).json({ message: "prestataireId and consultationDateOfJour are required" });
+    }
+
+    // Get the prestataire from the database
+    const prestataire = await Prestataire.findById(prestataireId);
+    if (!prestataire) {
+      return res.status(404).json({ message: "Prestataire not found" });
+    }
+
+    const availableTimes = prestataire.availableTimes || ["08:00", "17:00"];
+    const timezone = prestataire.timezone || 'Africa/Tunis'; // or any default timezone you use
+
+    // Convert availableTimes to moments in the prestataire's timezone
+    const startTime = moment.tz(availableTimes[0], "HH:mm", timezone);
+    const endTime = moment.tz(availableTimes[1], "HH:mm", timezone);
+
+    // Generate all time slots (30 min intervals)
+    const allTimeSlots = [];
+    let currentTime = startTime.clone();
+    while (currentTime.isBefore(endTime)) {
+      allTimeSlots.push(currentTime.format("HH:mm"));
+      currentTime.add(30, "minutes");
+    }
+
+    // Get all reservations for this prestataire and filter by date
+    const reservations = await Reservation.find({ prestataireId });
+    const filteredReservations = reservations.filter(res => {
+      return moment.tz(res.consultationDate, timezone).isSame(consultationDateOfJour, 'day');
+    });
+
+    // Extract reserved times (formatted to "HH:mm")
+    const reservedTimes = filteredReservations.map(res => {
+      return moment.tz(res.consultationDate, timezone).format("HH:mm");
+    });
+
+    // Calculate available slots by removing reserved times from all time slots
+    const availableSlots = allTimeSlots.filter(slot => !reservedTimes.includes(slot));
+
+    res.json({ availableSlots });
+  } catch (error) {
+    console.error("Error getting available time slots:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
 // 📥 Obtenir toutes les réservations d’un prestataire
 /*const getReservationsByPrestataire = async (req, res) => {
@@ -255,4 +338,6 @@ module.exports = {
     getNextAvailableTime,
     getReservationsByPatient,
     showPatientReservationCount,
+    getAvailableTimeSlots, // <== add this line
+
 };

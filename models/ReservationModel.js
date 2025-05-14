@@ -11,7 +11,12 @@ const reservationSchema = mongoose.Schema({
     ref: "Prestataire", // doit correspondre au nom du modèle prestataire
     required: true,
   },
+
   consultationDate: {
+    type: Date,
+    required: true,
+  },
+   consultationDateOfJour: {
     type: Date,
     required: true,
   },
