@@ -330,6 +330,37 @@ const showPatientReservationCount = async (req, res) => {
 };
 
 
+ const updateStatutReservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { statut } = req.body;
+
+    // Vérification du statut reçu
+    const statutsValid = ['accepté', 'refusé'];
+    if (!statutsValid.includes(statut)) {
+      return res.status(400).json({ message: 'Statut invalide' });
+    }
+
+    const reservation = await Reservation.findByIdAndUpdate(
+      id,
+      { statut },
+      { new: true }
+    );
+
+    if (!reservation) {
+      return res.status(404).json({ message: 'Réservation non trouvée' });
+    }
+
+    res.status(200).json({
+      message: `Réservation ${statut}`,
+      reservation
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error });
+  }
+};
+
+
 module.exports = {
     createReservation,
     getAllReservations,
@@ -339,5 +370,6 @@ module.exports = {
     getReservationsByPatient,
     showPatientReservationCount,
     getAvailableTimeSlots, // <== add this line
+    updateStatutReservation
 
 };

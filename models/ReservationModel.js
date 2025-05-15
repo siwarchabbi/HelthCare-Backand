@@ -28,6 +28,12 @@ const reservationSchema = mongoose.Schema({
     type: Number,
     required: true,
   },
+    statut: {
+    type: String,
+    enum: ['en attente', 'accepté', 'refusé'],
+    default: 'en attente'
+  },
+
 }, {
   timestamps: true
 });

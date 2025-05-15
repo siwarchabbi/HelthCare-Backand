@@ -10,6 +10,7 @@ const {
     getReservationsByPatient,
     showPatientReservationCount,
     getAvailableTimeSlots,
+    updateStatutReservation,
   } = require("../controllers/reservationController");
   
   
@@ -28,5 +29,6 @@ router.get('/patient-all-res/:patientId', getReservationsByPatient);
 // Exemple avec Express
 router.get('/count/:patientId', showPatientReservationCount);
 
+router.put('/:id/statut', updateStatutReservation);
 
 module.exports = router;
