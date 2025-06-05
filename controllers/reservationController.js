@@ -1,7 +1,10 @@
 const Reservation = require("../models/ReservationModel");
 const Prestataire = require("../models/PrestataireModel");
+const admin = require('../config/firebase'); // Assure-toi que le chemin est correct
+
 const Patient = require("../models/patientModel"); 
   // ✅ Créer une réservation
+
 
 const moment = require('moment-timezone');
 
@@ -330,25 +333,36 @@ const showPatientReservationCount = async (req, res) => {
 };
 
 
- const updateStatutReservation = async (req, res) => {
+const updateStatutReservation = async (req, res) => {
   try {
     const { id } = req.params;
     const { statut } = req.body;
 
-    // Vérification du statut reçu
     const statutsValid = ['accepté', 'refusé'];
     if (!statutsValid.includes(statut)) {
       return res.status(400).json({ message: 'Statut invalide' });
     }
 
-    const reservation = await Reservation.findByIdAndUpdate(
-      id,
-      { statut },
-      { new: true }
-    );
+    const reservation = await Reservation.findByIdAndUpdate(id, { statut }, { new: true });
 
     if (!reservation) {
       return res.status(404).json({ message: 'Réservation non trouvée' });
+    }
+
+    // ✅ Trouver le token du patient
+    const patient = await Patient.findById(reservation.patientId);
+    if (patient?.fcmToken) {
+      const message = {
+        notification: {
+          title: 'Mise à jour de votre réservation',
+          body: `Votre réservation a été ${statut}`,
+        },
+        token: patient.fcmToken,
+      };
+
+      // ✅ Envoyer la notification
+       await admin.messaging().send(message);
+      console.log("Notification envoyée !");
     }
 
     res.status(200).json({
@@ -356,6 +370,7 @@ const showPatientReservationCount = async (req, res) => {
       reservation
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Erreur serveur', error });
   }
 };

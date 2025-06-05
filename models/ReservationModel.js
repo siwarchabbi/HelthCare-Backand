@@ -3,20 +3,19 @@ const mongoose = require("mongoose");
 const reservationSchema = mongoose.Schema({
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Patient", // doit correspondre au nom du modèle patient
+    ref: "Patient",
     required: true,
   },
   prestataireId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Prestataire", // doit correspondre au nom du modèle prestataire
+    ref: "Prestataire",
     required: true,
   },
-
   consultationDate: {
     type: Date,
     required: true,
   },
-   consultationDateOfJour: {
+  consultationDateOfJour: {
     type: Date,
     required: true,
   },
@@ -28,14 +27,37 @@ const reservationSchema = mongoose.Schema({
     type: Number,
     required: true,
   },
-    statut: {
+  statut: {
     type: String,
     enum: ['en attente', 'accepté', 'refusé'],
     default: 'en attente'
   },
 
+  // ✅ 1. Confirmation de présence
+  confirmationPresence: {
+    type: Boolean,
+    default: false
+  },
+
+  // ✅ 2. Maladie
+  maladie: {
+    nom: { type: String },
+    message: { type: String }
+  },
+
+  // ✅ 3. Ordonnance avec maximum 3 images
+  ordonnance: {
+    type: [String],
+    validate: [arrayLimit, '{PATH} dépasse le maximum autorisé (3 images)']
+  }
+
 }, {
   timestamps: true
 });
+
+// Fonction de validation pour limiter à 3 images
+function arrayLimit(val) {
+  return val.length <= 3;
+}
 
 module.exports = mongoose.model("Reservation", reservationSchema);

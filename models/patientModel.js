@@ -7,6 +7,11 @@ const patientSchema = mongoose.Schema({
     required: true,
     unique: true,
   },
+  fcmToken: {
+  type: String,
+  required: false, // pas obligatoire mais utile
+},
+
   mutuelle: {
     type: String,
     required: false,

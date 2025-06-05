@@ -92,10 +92,33 @@ const getPatientByPatientId = asyncHandler(async (req, res) => {
   res.json(profile);
 });
 
+const updateFcmToken = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { fcmToken } = req.body;
+
+    const patient = await Patient.findOneAndUpdate(
+      { userId },
+      { fcmToken },
+      { new: true }
+    );
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient non trouvé' });
+    }
+
+    res.status(200).json({ message: 'FCM Token mis à jour' });
+  } catch (err) {
+    console.error("Erreur lors de la mise à jour du FCM Token :", err.message);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+};
+
 module.exports = {
   getAllPatients,
   getPatientById,
   updatePatientProfile,
   getPatientByPatientId,
+  updateFcmToken,
   
 };
