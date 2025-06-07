@@ -1,6 +1,7 @@
 const Reservation = require("../models/ReservationModel");
 const Prestataire = require("../models/PrestataireModel");
 const admin = require('../config/firebase'); // Assure-toi que le chemin est correct
+const path = require('path');
 
 const Patient = require("../models/patientModel"); 
   // ✅ Créer une réservation
@@ -376,6 +377,102 @@ const updateStatutReservation = async (req, res) => {
 };
 
 
+
+const confirmerPresenceEtNote = async (req, res) => {
+  try {
+    const { reservationId } = req.params;
+    const { nomMaladie, messageMaladie, confirmationPresence } = req.body;
+
+    let updateData = {
+      confirmationPresence: confirmationPresence === true || confirmationPresence === 'true',
+    };
+
+    if (updateData.confirmationPresence) {
+      // Si présence confirmée, on traite la note et ordonnance
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "Veuillez uploader au moins une image pour l'ordonnance." });
+      }
+
+      const ordonnanceImages = req.files.map(file => path.basename(file.path));
+
+      if (ordonnanceImages.length > 3) {
+        return res.status(400).json({ message: "Maximum 3 images autorisées pour l'ordonnance." });
+      }
+
+      updateData.note_maladie = {
+        nom: nomMaladie,
+        message: messageMaladie,
+      };
+      updateData.ordonnance = ordonnanceImages;
+    } else {
+      // Si présence false, on peut vider la note et ordonnance (optionnel)
+      updateData.note_maladie = null;
+      updateData.ordonnance = [];
+    }
+
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      reservationId,
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedReservation) {
+      return res.status(404).json({ message: "Réservation introuvable." });
+    }
+
+    res.status(200).json({
+      message: updateData.confirmationPresence
+        ? "✅ Présence confirmée avec note de maladie et ordonnance enregistrées"
+        : "❌ Présence annulée.",
+      reservation: updatedReservation,
+    });
+  } catch (error) {
+    console.error("Erreur:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+};
+
+
+
+
+// reservationController.js
+
+const getReservationById = async (req, res) => {
+  try {
+    const reservationId = req.params.id;
+
+    const reservation = await Reservation.findById(reservationId);
+
+    if (!reservation) {
+      return res.status(404).json({ message: 'Reservation not found' });
+    }
+
+    // Map fields properly according to your MongoDB document structure
+    res.json({
+      presenceConfirmed: reservation.confirmationPresence ?? null,
+      nomMaladie: reservation.note_maladie?.nom ?? '',
+      messageMaladie: reservation.note_maladie?.message ?? '',
+      ordonnanceImages: reservation.ordonnance ?? [],
+    });
+  } catch (error) {
+    console.error('Error fetching reservation:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 module.exports = {
     createReservation,
     getAllReservations,
@@ -385,6 +482,7 @@ module.exports = {
     getReservationsByPatient,
     showPatientReservationCount,
     getAvailableTimeSlots, // <== add this line
-    updateStatutReservation
+    updateStatutReservation,
+    confirmerPresenceEtNote, getReservationById
 
 };

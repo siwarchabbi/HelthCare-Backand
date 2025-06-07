@@ -40,7 +40,7 @@ const reservationSchema = mongoose.Schema({
   },
 
   // ✅ 2. Maladie
-  maladie: {
+  note_maladie: {
     nom: { type: String },
     message: { type: String }
   },

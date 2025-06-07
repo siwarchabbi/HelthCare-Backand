@@ -3,14 +3,13 @@ const path = require("path");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); // Make sure this folder exists
+    cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // unique filename
+    cb(null, Date.now() + path.extname(file.originalname));
   }
 });
 
-// Optional: restrict file types
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -23,6 +22,9 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ storage: storage, fileFilter: fileFilter });
+const upload = multer({ storage, fileFilter });
 
-module.exports = upload;
+module.exports = {
+  uploadSingle: upload.single('imageuser'),     // pour un seul fichier nommé imageuser
+  uploadMultiple: upload.array('ordonnanceImages', 3) // max 3 fichiers nommés ordonnanceImages
+};

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { uploadSingle, uploadMultiple } = require('../middleware/upload');
 
 const {
     createReservation,
@@ -11,6 +12,8 @@ const {
     showPatientReservationCount,
     getAvailableTimeSlots,
     updateStatutReservation,
+    confirmerPresenceEtNote,
+    getReservationById,
   } = require("../controllers/reservationController");
   
   
@@ -30,5 +33,7 @@ router.get('/patient-all-res/:patientId', getReservationsByPatient);
 router.get('/count/:patientId', showPatientReservationCount);
 
 router.put('/:id/statut', updateStatutReservation);
+router.put("/confirmer-presence/:reservationId",uploadMultiple,confirmerPresenceEtNote );
+router.get('/reservations-by-id/:id', getReservationById);
 
 module.exports = router;

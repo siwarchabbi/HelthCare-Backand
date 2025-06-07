@@ -10,7 +10,7 @@ const {
 } = require("../controllers/prestataireController");
 
 const validateToken = require("../middleware/validateTokenHandler");
-const upload = require("../middleware/upload"); // ✅ Use the central upload config
+const { uploadSingle, uploadMultiple } = require('../middleware/upload');
 
 
 
@@ -18,7 +18,7 @@ const upload = require("../middleware/upload"); // ✅ Use the central upload co
 router.get("/:userId", getPrestataireProfile);
 
 // ✅ Mettre à jour un profil prestataire (protégé)
-router.put("/:userId", upload.single('imageuser'), updatePrestataireProfile);
+router.put("/:userId", uploadSingle, updatePrestataireProfile);
 
 // ✅ Récupérer tous les prestataires (public ou protégé selon ton choix) 
 router.get("/", getAllPrestataires);
