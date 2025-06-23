@@ -27,17 +27,24 @@ const reservationSchema = mongoose.Schema({
     type: Number,
     required: true,
   },
-  statut: {
-    type: String,
-    enum: ['en attente', 'accepté', 'refusé'],
-    default: 'en attente'
-  },
+statut: {
+  type: String,
+  enum: ['en attente', 'accepté', 'refusé', 'annulé'],
+  default: 'en attente'
+},
 
   // ✅ 1. Confirmation de présence
   confirmationPresence: {
     type: Boolean,
-    default: false
+
   },
+  numeroRendezVous: {
+  type: String,
+  unique: true, // To avoid duplicates
+  sparse: true, // Allows null values without uniqueness conflict
+
+},
+
 
   // ✅ 2. Maladie
   note_maladie: {

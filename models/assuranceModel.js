@@ -16,6 +16,8 @@ const assureurSchema = mongoose.Schema(
       type: Number,
       default: 0, // % de réduction, par défaut 0
     },
+   
+  
   },
   {
     timestamps: true,

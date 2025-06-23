@@ -197,33 +197,60 @@ const getAvailableTimeSlots = async (req, res) => {
   
 
 
-  const getAllReservationsWithDetails = async (req, res) => {
-    try {
-      const reservations = await Reservation.find()
-        .populate({
-          path: "patientId",
-          populate: {
-            path: "userId", // embedded user in patient
-            select: "nom prenom email"
-          },
-          select: "mutuelle dossierMedical userId"
-        })
-        .populate({
-          path: "prestataireId",
-          select: "speciality experience userId",
-          populate: {
-            path: "userId",
-            select: "nom prenom email"
-          }
-        })
-        .sort({ consultationDate: 1 });
-  
-      res.status(200).json(reservations);
-    } catch (err) {
-      res.status(500).json({ message: "Erreur serveur", error: err.message });
-    }
-  };
-  
+const getAllReservationsWithDetails = async (req, res) => {
+  try {
+    const reservations = await Reservation.find({})
+      .populate({
+        path: "patientId",
+        select: "mutuelle dossierMedical userId",
+        populate: {
+          path: "userId",
+          select: "nom prenom email username"  // Ajout de username
+        }
+      })
+      .populate({
+        path: "prestataireId",
+        select: "speciality experience userId",
+        populate: {
+          path: "userId",
+          select: "nom prenom email username"  // Ajout de username
+        }
+      })
+      .sort({ consultationDate: 1 })
+      .lean();
+
+    const formattedReservations = reservations.map((reservation) => ({
+      _id: reservation._id,
+      patientId: reservation.patientId,
+      prestataireId: reservation.prestataireId,
+      presenceConfirmed: reservation.confirmationPresence ?? null,
+      nomMaladie: reservation.note_maladie?.nom ?? '',
+      messageMaladie: reservation.note_maladie?.message ?? '',
+      ordonnanceImages: reservation.ordonnance ?? [],
+      numeroRendezVous: reservation.numeroRendezVous || null,
+      consultationDate: reservation.consultationDate
+        ? new Date(reservation.consultationDate).toISOString()
+        : null,
+      consultationDateOfJour: reservation.consultationDateOfJour,
+      consultationDuration: reservation.consultationDuration,
+      consultationPrice: reservation.consultationPrice,
+      statut: reservation.statut,
+      createdAt: reservation.createdAt,
+      updatedAt: reservation.updatedAt,
+    }));
+
+    res.status(200).json(formattedReservations);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des réservations :", err);
+    res.status(500).json({
+      message: "Erreur serveur lors de la récupération des réservations",
+      error: err.message
+    });
+  }
+};
+
+
+
 // 📥 Obtenir toutes les consultations d’un patient chez un prestataire
 const getConsultationsByPatientAndPrestataire = async (req, res) => {
   try {
@@ -241,54 +268,7 @@ const getConsultationsByPatientAndPrestataire = async (req, res) => {
 
 
 
-const getNextAvailableTime = async (req, res) => {
-  try {
-    const { prestataireId } = req.params;
 
-    const prestataire = await Prestataire.findById(prestataireId);
-    if (!prestataire) {
-      return res.status(404).json({ message: "Prestataire non trouvé" });
-    }
-
-    const duration = prestataire.consultationDuration || 60;
-    const availableTimes = prestataire.availableTimes;
-
-    if (!availableTimes || availableTimes.length === 0) {
-      return res.status(400).json({ message: "Le prestataire n'a pas d'horaires définis." });
-    }
-
-    const startTime = moment(availableTimes[0], "HH:mm");
-
-    // Récupère la dernière réservation
-    const lastReservation = await Reservation.findOne({ prestataireId })
-      .sort({ consultationDate: -1 });
-
-    let nextAvailableTime;
-
-    if (lastReservation) {
-      nextAvailableTime = moment(lastReservation.consultationDate).add(lastReservation.consultationDuration, "minutes");
-    } else {
-      // Aucune réservation, donc premier créneau dispo = heure définie aujourd'hui ou demain si déjà passé
-      nextAvailableTime = moment().set({
-        hour: startTime.hours(),
-        minute: startTime.minutes(),
-        second: 0,
-        millisecond: 0,
-      });
-
-      // Si l'heure est déjà passée pour aujourd'hui, on prend demain
-      if (nextAvailableTime.isBefore(moment())) {
-        nextAvailableTime.add(1, 'day');
-      }
-    }
-
-    return res.status(200).json({ nextAvailableTime: nextAvailableTime.toISOString() });
-
-  } catch (err) {
-    console.error("Erreur:", err.message);
-    return res.status(500).json({ message: "Erreur serveur", error: err.message });
-  }
-};
 
   // 📥 Obtenir toutes les réservations d’un patient
 const getReservationsByPatient = async (req, res) => {
@@ -339,16 +319,25 @@ const updateStatutReservation = async (req, res) => {
     const { id } = req.params;
     const { statut } = req.body;
 
-    const statutsValid = ['accepté', 'refusé'];
+    const statutsValid = ['accepté', 'refusé', 'annulé'];
     if (!statutsValid.includes(statut)) {
       return res.status(400).json({ message: 'Statut invalide' });
     }
 
-    const reservation = await Reservation.findByIdAndUpdate(id, { statut }, { new: true });
+    const reservation = await Reservation.findById(id);
 
     if (!reservation) {
       return res.status(404).json({ message: 'Réservation non trouvée' });
     }
+
+    // 🔒 Règle métier : si déjà accepté, on autorise uniquement "annulé"
+    if (reservation.statut === 'accepté' && statut !== 'annulé') {
+      return res.status(400).json({ message: 'Impossible de modifier une réservation acceptée sauf pour l’annuler.' });
+    }
+
+    // ✅ Mettre à jour le statut
+    reservation.statut = statut;
+    await reservation.save();
 
     // ✅ Trouver le token du patient
     const patient = await Patient.findById(reservation.patientId);
@@ -361,8 +350,7 @@ const updateStatutReservation = async (req, res) => {
         token: patient.fcmToken,
       };
 
-      // ✅ Envoyer la notification
-       await admin.messaging().send(message);
+      await admin.messaging().send(message);
       console.log("Notification envoyée !");
     }
 
@@ -370,9 +358,78 @@ const updateStatutReservation = async (req, res) => {
       message: `Réservation ${statut}`,
       reservation
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erreur serveur', error });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+/*function generateNumeroRendezVous() {
+  let num = '';
+  for (let i = 0; i < 11; i++) {
+    num += Math.floor(Math.random() * 10); // random digit 0-9
+  }
+  return num;
+}*/
+
+const getReservationById = async (req, res) => {
+  try {
+    const { id: reservationId } = req.params;
+
+    const reservation = await Reservation.findById(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ message: "Réservation introuvable" });
+    }
+
+    res.json({
+      presenceConfirmed: reservation.confirmationPresence ?? null,
+      nomMaladie: reservation.note_maladie?.nom ?? '',
+      messageMaladie: reservation.note_maladie?.message ?? '',
+      ordonnanceImages: reservation.ordonnance ?? [],
+      numeroRendezVous: reservation.numeroRendezVous || null,
+      consultationDate: reservation.consultationDate
+        ? reservation.consultationDate.toISOString()
+        : null,
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération de la réservation:', error);
+    return res.status(500).json({ message: 'Erreur serveur interne' });
+  }
+};
+
+
+function generateNumeroRendezVous() {
+  return Math.floor(1e10 + Math.random() * 9e10).toString();
+}
+
+
+const sendFCMNotification = async (token, title, body) => {
+  try {
+    const message = {
+      notification: {
+        title,
+        body,
+      },
+      token,
+    };
+
+    await admin.messaging().send(message);
+    console.log("📩 Notification envoyée !");
+  } catch (error) {
+    console.error("❌ Erreur envoi FCM :", error.message);
   }
 };
 
@@ -382,87 +439,198 @@ const confirmerPresenceEtNote = async (req, res) => {
   try {
     const { reservationId } = req.params;
     const { nomMaladie, messageMaladie, confirmationPresence } = req.body;
+    const isPresenceConfirmed = confirmationPresence === 'true' || confirmationPresence === true;
 
-    let updateData = {
-      confirmationPresence: confirmationPresence === true || confirmationPresence === 'true',
-    };
-
-    if (updateData.confirmationPresence) {
-      // Si présence confirmée, on traite la note et ordonnance
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: "Veuillez uploader au moins une image pour l'ordonnance." });
-      }
-
-      const ordonnanceImages = req.files.map(file => path.basename(file.path));
-
-      if (ordonnanceImages.length > 3) {
-        return res.status(400).json({ message: "Maximum 3 images autorisées pour l'ordonnance." });
-      }
-
-      updateData.note_maladie = {
-        nom: nomMaladie,
-        message: messageMaladie,
-      };
-      updateData.ordonnance = ordonnanceImages;
-    } else {
-      // Si présence false, on peut vider la note et ordonnance (optionnel)
-      updateData.note_maladie = null;
-      updateData.ordonnance = [];
-    }
-
-    const updatedReservation = await Reservation.findByIdAndUpdate(
-      reservationId,
-      updateData,
-      { new: true }
-    );
-
-    if (!updatedReservation) {
+    const existingReservation = await Reservation.findById(reservationId).populate('patientId');
+    if (!existingReservation) {
       return res.status(404).json({ message: "Réservation introuvable." });
     }
 
-    res.status(200).json({
-      message: updateData.confirmationPresence
-        ? "✅ Présence confirmée avec note de maladie et ordonnance enregistrées"
-        : "❌ Présence annulée.",
-      reservation: updatedReservation,
+    if (isPresenceConfirmed) {
+      const ordonnanceFiles = req.files;
+
+      if (!ordonnanceFiles || ordonnanceFiles.length === 0) {
+        return res.status(400).json({ message: "Veuillez uploader au moins une image pour l'ordonnance." });
+      }
+
+      if (ordonnanceFiles.length > 3) {
+        return res.status(400).json({ message: "Maximum 3 images autorisées." });
+      }
+
+      const ordonnanceImages = ordonnanceFiles.map(file => path.basename(file.path));
+
+      const updateData = {
+        confirmationPresence: true,
+        note_maladie: {
+          nom: nomMaladie || "",
+          message: messageMaladie || "",
+        },
+        ordonnance: ordonnanceImages,
+      };
+
+      if (!existingReservation.numeroRendezVous) {
+        updateData.numeroRendezVous = generateNumeroRendezVous();
+      }
+
+      const updatedReservation = await Reservation.findByIdAndUpdate(
+        reservationId,
+        updateData,
+        { new: true }
+      );
+
+      // ✅ Notification FCM si le token existe
+      if (existingReservation.patientId?.fcmToken) {
+        const token = existingReservation.patientId.fcmToken;
+        const title = "✅ Rendez-vous confirmé";
+        const body = "Votre présence au rendez-vous a été confirmée avec succès.";
+        await sendFCMNotification(token, title, body);
+      }
+
+      return res.status(200).json({
+        message: "✅ Présence confirmée et ordonnance mise à jour.",
+        data: updatedReservation,
+      });
+    } else {
+      const updatedReservation = await Reservation.findByIdAndUpdate(
+        reservationId,
+        {
+          confirmationPresence: false,
+          note_maladie: null,
+          ordonnance: [],
+          $unset: { numeroRendezVous: "" },
+        },
+        { new: true }
+      );
+
+      // ✅ Notification FCM si le token existe
+      if (existingReservation.patientId?.fcmToken) {
+        const token = existingReservation.patientId.fcmToken;
+        const title = "❌ Rendez-vous annulé";
+        const body = "Votre rendez-vous a été annulé.";
+        await sendFCMNotification(token, title, body);
+      }
+
+      return res.status(200).json({
+        message: "⚠️ Présence annulée et données nettoyées.",
+        data: updatedReservation,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Erreur serveur.", error: error.message });
+  }
+};
+
+
+const modifierOrdonnance = async (req, res) => {
+  try {
+    const { reservationId } = req.params;
+    const ordonnanceFiles = req.files;
+
+    // Vérifier si les images sont bien envoyées
+    if (!ordonnanceFiles || ordonnanceFiles.length === 0) {
+      return res.status(400).json({ message: "Veuillez uploader au moins une image pour l'ordonnance." });
+    }
+
+    if (ordonnanceFiles.length > 3) {
+      return res.status(400).json({ message: "Maximum 3 images autorisées." });
+    }
+
+    // Vérifier si la réservation existe
+    const reservation = await Reservation.findById(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ message: "Réservation introuvable." });
+    }
+
+    // Stocker les nouveaux noms d’images
+    const newOrdonnanceImages = ordonnanceFiles.map(file => path.basename(file.path));
+
+    // Mettre à jour uniquement les images de l'ordonnance
+    reservation.ordonnance = newOrdonnanceImages;
+    await reservation.save();
+
+    return res.status(200).json({
+      message: "✅ Ordonnance modifiée avec succès.",
+      data: reservation,
     });
   } catch (error) {
-    console.error("Erreur:", error);
+    console.error(error);
+    return res.status(500).json({ message: "Erreur serveur.", error: error.message });
+  }
+};
+
+
+
+
+
+
+
+const getNextAvailableTime = async (req, res) => {
+  try {
+    const { prestataireId, consultationDateOfJour } = req.query;
+
+    if (!prestataireId || !consultationDateOfJour) {
+      return res.status(400).json({ message: "prestataireId and consultationDateOfJour are required" });
+    }
+
+    const prestataire = await Prestataire.findById(prestataireId);
+    if (!prestataire) {
+      return res.status(404).json({ message: "Prestataire non trouvé" });
+    }
+
+    const duration = prestataire.consultationDuration || 60;
+
+    // Available time range, e.g., "09:15-18:00"
+    const [startTimeStr, endTimeStr] = prestataire.availableTimes[0].split('-');
+
+    const timezone = 'Africa/Tunis'; // Or prestataire.timezone if you have it
+
+    const startRange = moment.tz(`${consultationDateOfJour} ${startTimeStr}`, 'YYYY-MM-DD HH:mm', timezone);
+    let endRange = moment.tz(`${consultationDateOfJour} ${endTimeStr}`, 'YYYY-MM-DD HH:mm', timezone);
+    if (endRange.isBefore(startRange)) {
+      endRange.add(1, 'day');
+    }
+
+    // Fetch all reservations for this prestataire
+    const reservations = await Reservation.find({ prestataireId });
+
+    const dayStart = moment.tz(consultationDateOfJour, 'YYYY-MM-DD', timezone).startOf('day');
+    const dayEnd = dayStart.clone().endOf('day');
+
+    // Filter reservations to only those on the given day
+    const filteredReservations = reservations.filter(res => {
+      const resMoment = moment.tz(res.consultationDate, timezone);
+      return resMoment.isBetween(dayStart, dayEnd, null, '[]');  // inclusive range
+    });
+
+    // Find the latest reservation end time
+    let latestReservationEnd = startRange.clone();
+
+    for (const r of filteredReservations) {
+      const resStart = moment.tz(r.consultationDate, timezone);
+      const resEnd = resStart.clone().add(r.consultationDuration || duration, 'minutes');
+      if (resEnd.isAfter(latestReservationEnd)) {
+        latestReservationEnd = resEnd;
+      }
+    }
+
+    // Calculate next available time slot after the last reservation
+    let nextAvailable = latestReservationEnd;
+
+    if (nextAvailable.isBefore(endRange)) {
+      const nextAvailableTimeStr = nextAvailable.format('HH:mm:ss');
+      return res.json({ nextAvailableTime: nextAvailableTimeStr });
+    } else {
+      // If day fully booked, return the next day's start time
+      const nextDayStart = startRange.clone().add(1, 'day').format('HH:mm:ss');
+      return res.json({ nextAvailableTime: nextDayStart });
+    }
+
+  } catch (error) {
+    console.error('Erreur getNextAvailableTime:', error);
     res.status(500).json({ message: "Erreur serveur", error: error.message });
   }
 };
-
-
-
-
-// reservationController.js
-
-const getReservationById = async (req, res) => {
-  try {
-    const reservationId = req.params.id;
-
-    const reservation = await Reservation.findById(reservationId);
-
-    if (!reservation) {
-      return res.status(404).json({ message: 'Reservation not found' });
-    }
-
-    // Map fields properly according to your MongoDB document structure
-    res.json({
-      presenceConfirmed: reservation.confirmationPresence ?? null,
-      nomMaladie: reservation.note_maladie?.nom ?? '',
-      messageMaladie: reservation.note_maladie?.message ?? '',
-      ordonnanceImages: reservation.ordonnance ?? [],
-    });
-  } catch (error) {
-    console.error('Error fetching reservation:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-
-
-
 
 
 
@@ -478,11 +646,13 @@ module.exports = {
     getAllReservations,
     getAllReservationsWithDetails,
     getConsultationsByPatientAndPrestataire,
-    getNextAvailableTime,
     getReservationsByPatient,
     showPatientReservationCount,
     getAvailableTimeSlots, // <== add this line
     updateStatutReservation,
-    confirmerPresenceEtNote, getReservationById
+    confirmerPresenceEtNote, 
+    getReservationById,
+    getNextAvailableTime,
+    modifierOrdonnance
 
 };

@@ -7,13 +7,14 @@ const {
     getAllReservations,
     getAllReservationsWithDetails,
     getConsultationsByPatientAndPrestataire,
-    getNextAvailableTime,
     getReservationsByPatient,
     showPatientReservationCount,
     getAvailableTimeSlots,
     updateStatutReservation,
     confirmerPresenceEtNote,
     getReservationById,
+    getNextAvailableTime,
+    modifierOrdonnance
   } = require("../controllers/reservationController");
   
   
@@ -27,13 +28,14 @@ router.post('/available-timeslots', getAvailableTimeSlots);
 
 // Obtenir les consultations d’un patient avec un prestataire
 router.get("/by-patient-and-prestataire/:patientId/:prestataireId", getConsultationsByPatientAndPrestataire);
-router.get("/next-available/:prestataireId", getNextAvailableTime);
 router.get('/patient-all-res/:patientId', getReservationsByPatient);
 // Exemple avec Express
 router.get('/count/:patientId', showPatientReservationCount);
 
 router.put('/:id/statut', updateStatutReservation);
 router.put("/confirmer-presence/:reservationId",uploadMultiple,confirmerPresenceEtNote );
+router.put(
+  '/:reservationId/modifier-ordonnance',uploadMultiple,modifierOrdonnance);
 router.get('/reservations-by-id/:id', getReservationById);
-
+router.get('/nextAvailableTime', getNextAvailableTime);
 module.exports = router;

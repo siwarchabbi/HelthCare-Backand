@@ -5,6 +5,9 @@ const {
   updateAssureurProfileByAssureurId,
   getAssureurById, // 👈 Ajout ici
   togglePatientVerification,
+   addDossierTraitement,
+  updateDossierTraitementStatus,
+  getDossierTraitementByAssureur,
 } = require("../controllers/assureurController");
 
 // 🔄 Mettre à jour un profil
@@ -18,6 +21,8 @@ router.put("/verify/:prestataireId", toggleVerification);
 // ✅ Vérifier/déverifier un patient
 
 router.put("/verify-patent/:patientId", togglePatientVerification);
+
+
 
 
 module.exports = router;

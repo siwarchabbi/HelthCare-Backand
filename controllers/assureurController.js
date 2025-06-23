@@ -1,3 +1,6 @@
+const mongoose = require('mongoose'); // ✅ à ajouter
+
+// Ta fonction addDossierTraitement ici...
 const Prestataire = require("../models/PrestataireModel");
 const Assureur = require('../models/assuranceModel');  // Adjust the path to your Assureur model
 const Patient = require("../models/patientModel");
@@ -138,11 +141,20 @@ const getAssureurById = async (req, res) => {
 };
 
 
+
+
+
+// Ajouter un dossier à traiter (par exemple quand patient soumet dossier)
+
+
+
+
 module.exports = {
   toggleVerification,
   updateAssureurProfileByAssureurId,
   getAssureurById,
   togglePatientVerification,
+ 
 };
 
 
