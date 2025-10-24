@@ -119,11 +119,11 @@ const updatePrestataireProfile = asyncHandler(async (req, res) => {
 
     // If an image is uploaded, update the image field in the User model
    
+ 
     if (req.file) {
-      updateData.imageuser = req.file.filename;
+  user.imageuser = req.file.filename; // save the uploaded file
     }
-
-    await user.save();
+        await user.save();
 
     const prestataire = await Prestataire.findOne({ userId });
     if (!prestataire) {
@@ -148,6 +148,30 @@ const updatePrestataireProfile = asyncHandler(async (req, res) => {
         .split(', ')
         .map((e) => e.trim());
     }
+if (updateData.location) {
+  let parsedLocation = updateData.location;
+
+  // 🧩 If location is a JSON string, parse it first
+  if (typeof parsedLocation === "string") {
+    try {
+      parsedLocation = JSON.parse(parsedLocation);
+    } catch (err) {
+      console.error("❌ Invalid location JSON:", err);
+    }
+  }
+
+  // ✅ Now check if it contains valid coordinates
+  if (parsedLocation.coordinates && Array.isArray(parsedLocation.coordinates)) {
+    prestataire.location = {
+      type: "Point",
+      coordinates: parsedLocation.coordinates,
+    };
+  }
+}
+
+
+
+
 
     // Handle availableTimes field
    // Handle availableTimes field
@@ -245,6 +269,7 @@ const getPrestataireByPrestataireId = asyncHandler(async (req, res) => {
       consultationPrice: prestataire.consultationPrice,
       location: prestataire.location,
       isVerified: prestataire.isVerified,
+      nextAvailableTime:prestataire.nextAvailableTime,
       _id: prestataire._id
     }
   };

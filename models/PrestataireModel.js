@@ -84,6 +84,10 @@ const prestataireSchema = mongoose.Schema({
     type: Boolean,
     default: false,
   },
+   nextAvailableTime: { // <-- nouveau champ
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

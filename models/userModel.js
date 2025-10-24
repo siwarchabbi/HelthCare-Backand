@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
@@ -85,6 +86,8 @@ userSchema.methods.updateInfo = function (updateData) {
   if (updateData.phone) this.phone = updateData.phone;
   if (updateData.firstname) this.firstname = updateData.firstname;
   if (updateData.lastname) this.lastname = updateData.lastname;
+    if (updateData.location) this.location = updateData.location;
+
   if (updateData.address) this.address = updateData.address;
   if (updateData.image) this.image = updateData.image;
   if (updateData.imageuser) this.imageuser = updateData.imageuser;

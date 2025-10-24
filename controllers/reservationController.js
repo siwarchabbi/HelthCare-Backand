@@ -15,72 +15,48 @@ const createReservation = async (req, res) => {
     const { patientId, prestataireId, consultationDateOfJour, consultationDate } = req.body;
 
     const prestataire = await Prestataire.findById(prestataireId);
-    if (!prestataire) {
-      return res.status(404).json({ message: "Prestataire non trouvé" });
-    }
+    if (!prestataire) return res.status(404).json({ message: "Prestataire non trouvé" });
 
     const duration = prestataire.consultationDuration || 60;
-
-    // Exemple: "09:15-18:00"
     const [startTimeStr, endTimeStr] = prestataire.availableTimes[0].split('-');
 
-    // On parse la date du jour sans heure
     const day = moment.tz(consultationDateOfJour, 'YYYY-MM-DD', 'Africa/Tunis').startOf('day');
-
-    // On parse la date + heure dans le fuseau horaire de Tunis
     const start = moment.tz(`${consultationDateOfJour} ${consultationDate}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
-
     const startRange = moment.tz(`${consultationDateOfJour} ${startTimeStr}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
     let endRange = moment.tz(`${consultationDateOfJour} ${endTimeStr}`, 'YYYY-MM-DD HH:mm', 'Africa/Tunis');
-
-    if (endRange.isBefore(startRange)) {
-      endRange.add(1, 'day');
-    }
+    if (endRange.isBefore(startRange)) endRange.add(1, 'day');
 
     if (!start.isBetween(startRange, endRange, null, '[)')) {
-      return res.status(400).json({
-        message: `Heure hors plage autorisée : de ${startTimeStr} à ${endTimeStr}`,
-      });
+      return res.status(400).json({ message: `Heure hors plage autorisée : de ${startTimeStr} à ${endTimeStr}` });
     }
 
-    // Vérifie si le créneau est déjà réservé
-    const existingReservation = await Reservation.findOne({
-      prestataireId,
-      consultationDate: start.toDate(),
-    });
-
-    if (existingReservation) {
-      return res.status(409).json({ message: "Ce créneau est déjà réservé" });
-    }
+    const existingReservation = await Reservation.findOne({ prestataireId, consultationDate: start.toDate() });
+    if (existingReservation) return res.status(409).json({ message: "Ce créneau est déjà réservé" });
 
     const reservation = new Reservation({
       patientId,
       prestataireId,
-      consultationDate: start.toDate(),      // date+heure en UTC mais issue de l'heure locale
-      consultationDateOfJour: day.toDate(),  // juste la date (heure 00:00)
+      consultationDate: start.toDate(),
+      consultationDateOfJour: day.toDate(),
       consultationDuration: duration,
       consultationPrice: prestataire.consultationPrice,
     });
-
     await reservation.save();
 
-    // Calcule prochaine dispo
+    // ➕ Incrémentation des réservations confirmées
+    prestataire.reservationsConfirmées = (prestataire.reservationsConfirmées || 0) + 1;
+
+    // Calcul et sauvegarde du nextAvailableTime dans le prestataire
     const nextAvailable = moment(start).add(duration, 'minutes');
-    let nextAvailableTime;
+    prestataire.nextAvailableTime = nextAvailable.toDate();
 
-    if (nextAvailable.isBefore(endRange)) {
-      nextAvailableTime = nextAvailable.format("HH:mm:ss");
-    } else {
-      nextAvailableTime = startRange.add(1, 'day').format("HH:mm:ss");
-    }
-
-    prestataire.lastAvailableTime = nextAvailable.toDate();
     await prestataire.save();
 
     res.status(201).json({
-      message: "Réservation confirmée",
+      message: "Réservation confirmée et compteur mis à jour",
       reservation,
-      nextAvailableTime
+      nextAvailableTime: prestataire.nextAvailableTime,
+      reservationsConfirmées: prestataire.reservationsConfirmées
     });
 
   } catch (err) {
@@ -88,6 +64,7 @@ const createReservation = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur", error: err.message });
   }
 };
+
 
 
 
@@ -399,6 +376,7 @@ const getReservationById = async (req, res) => {
       messageMaladie: reservation.note_maladie?.message ?? '',
       ordonnanceImages: reservation.ordonnance ?? [],
       numeroRendezVous: reservation.numeroRendezVous || null,
+      nextAvailableTime:reservation.nextAvailableTime || null,
       consultationDate: reservation.consultationDate
         ? reservation.consultationDate.toISOString()
         : null,
