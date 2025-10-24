@@ -12,28 +12,32 @@ const toggleVerification = async (req, res) => {
     const { prestataireId } = req.params;
     const { isVerified } = req.body;
 
+    // 🔍 Trouver le prestataire
     const prestataire = await Prestataire.findById(prestataireId).populate("userId");
     if (!prestataire) {
-      return res.status(404).json({ message: "Prestataire not found" });
+      return res.status(404).json({ message: "Prestataire non trouvé" });
     }
 
+    // 🔄 Changer seulement la vérification
     prestataire.isVerified = isVerified;
-    await prestataire.save();
+    await prestataire.save({ validateBeforeSave: false }); // ✅ Ignore validation des autres champs
 
-    // Send email
+    // 📧 Envoyer un email
     const email = prestataire.userId.email;
     const username = prestataire.userId.username;
     await sendVerificationEmail(email, username, isVerified);
 
     res.status(200).json({
-      message: `Prestataire ${isVerified ? "verified" : "unverified"} successfully.`,
+      message: `Prestataire ${isVerified ? "vérifié" : "non vérifié"} avec succès.`,
       prestataire,
     });
   } catch (error) {
-    console.error("Verification error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Erreur vérification prestataire :", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 };
+
+
 
 
 
